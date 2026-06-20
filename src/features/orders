@@ -1,0 +1,15 @@
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "../../services/firebase";
+
+export const createOrder = async (items, total) => {
+  try {
+    await addDoc(collection(db, "orders"), {
+      items,
+      total,
+      status: "กำลังทำ",
+      createdAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error("Create Order Error:", error);
+  }
+};
