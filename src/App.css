@@ -154,10 +154,7 @@ h2,
   border-radius: 12px;
   margin-bottom: 12px;
 }
-.menu-card:hover {
-  transform: translateY(-5px);
-  transition: 0.3s;
-}
+
 .logo-header {
   display: flex;
   justify-content: center;
@@ -207,4 +204,36 @@ h2,
   text-align: center;
   font-size: 16px;
   outline: none;
+}
+.status-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.status-pending,
+.status-complete,
+.status-served {
+  padding: 10px 22px;
+  border-radius: 999px;
+  font-weight: bold;
+  font-size: 16px;
+  display: inline-block;
+}
+
+.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-complete {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-served {
+  background: #dcfce7;
+  color: #166534;
 }

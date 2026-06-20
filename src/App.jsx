@@ -317,10 +317,27 @@ const formatDate = (timestamp) => {
   <strong>โต๊ะ:</strong>{" "}
   {order.tableNumber || "-"}
 </p>
-          <p>
-            <strong>สถานะ:</strong>{" "}
-            {order.status}
-          </p>
+          <div className="status-line">
+  <strong>สถานะ:</strong>
+
+  {order.status === "กำลังทำ" && (
+    <div className="status-pending">
+      🟡 กำลังทำ
+    </div>
+  )}
+
+  {order.status === "เสร็จแล้ว" && (
+    <div className="status-complete">
+      🔵 เสร็จแล้ว
+    </div>
+  )}
+
+  {order.status === "เสิร์ฟแล้ว" && (
+    <div className="status-served">
+      🟢 เสิร์ฟแล้ว
+    </div>
+  )}
+</div>
 
           <p>
             <strong>ราคารวม:</strong>{" "}
