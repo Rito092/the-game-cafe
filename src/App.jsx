@@ -22,6 +22,7 @@ function App() {
   const [orders, setOrders] = useState([]);
   const [menu, setMenu] = useState([]);
   const [tableNumber, setTableNumber] = useState("");
+  const [searchTable, setSearchTable] = useState("");
 const menuImages = {
   americano: americanoImg,
   cappuccino: cappuccinoImg,
@@ -187,6 +188,12 @@ const menuImages = {
     fetchMenu();
     fetchOrders();
   }, []);
+  const filteredOrders = searchTable
+  ? orders.filter(
+      (order) =>
+        String(order.tableNumber || "").includes(searchTable)
+    )
+  : orders;
 const formatDate = (timestamp) => {
   if (!timestamp) return "ไม่มีเวลา";
 
@@ -261,7 +268,7 @@ const formatDate = (timestamp) => {
       <h2 className="section-title">
         🛒 ตะกร้าสินค้า
       </h2>
-
+    
       <div className="cart-center">
   <div className="cart-panel">
     {cart.length === 0 ? (
@@ -298,17 +305,29 @@ const formatDate = (timestamp) => {
 
     <h3>รวม {total} บาท</h3>
 
-    <button className="btn" onClick={saveOrder}>
-      บันทึกออเดอร์
-    </button>
+<button
+  className="btn"
+  onClick={saveOrder}
+  disabled={cart.length === 0}
+>
+  บันทึกออเดอร์
+</button>
   </div>
 </div>
 
 <h2 className="section-title">
   📋 Orders
 </h2>
-
-      {orders.map((order) => (
+<div className="search-box">
+  <input
+    type="number"
+    placeholder="ค้นหาเลขโต๊ะ เช่น 1"
+    value={searchTable}
+    onChange={(e) => setSearchTable(e.target.value)}
+    className="search-input"
+  />
+</div>
+      {filteredOrders.map((order) => (
         <div
   key={order.id}
   className="order-card"
@@ -349,7 +368,11 @@ const formatDate = (timestamp) => {
 </p>
           <div className="order-buttons">
             <button
-  className="btn"
+  className={
+    order.status === "กำลังทำ"
+      ? "btn btn-pending"
+      : "btn"
+  }
   onClick={() =>
     updateOrderStatus(
       order.id,
@@ -361,7 +384,11 @@ const formatDate = (timestamp) => {
 </button>
 
             <button
-  className="btn"
+  className={
+    order.status === "เสร็จแล้ว"
+      ? "btn btn-complete"
+      : "btn"
+  }
   onClick={() =>
     updateOrderStatus(
       order.id,
@@ -373,7 +400,11 @@ const formatDate = (timestamp) => {
 </button>
 
             <button
-  className="btn"
+  className={
+    order.status === "เสิร์ฟแล้ว"
+      ? "btn btn-served"
+      : "btn"
+  }
   onClick={() =>
     updateOrderStatus(
       order.id,
