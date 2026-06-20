@@ -21,6 +21,7 @@ function App() {
   const [cart, setCart] = useState([]);
   const [orders, setOrders] = useState([]);
   const [menu, setMenu] = useState([]);
+  const [tableNumber, setTableNumber] = useState("");
 const menuImages = {
   americano: americanoImg,
   cappuccino: cappuccinoImg,
@@ -123,6 +124,10 @@ const menuImages = {
 };
 
   const saveOrder = async () => {
+      if (!tableNumber) {
+    alert("กรุณากรอกเลขโต๊ะ");
+    return;
+  }
     if (cart.length === 0) {
       alert("กรุณาเลือกสินค้า");
       return;
@@ -130,6 +135,7 @@ const menuImages = {
 
     try {
       await addDoc(collection(db, "orders"), {
+         tableNumber: tableNumber,
         items: cart,
         total: total,
         status: "กำลังทำ",
@@ -138,6 +144,7 @@ const menuImages = {
 
       alert("บันทึกออเดอร์สำเร็จ");
       setCart([]);
+      setTableNumber("");
       fetchOrders();
     } catch (error) {
       console.error(error);
@@ -257,33 +264,43 @@ const formatDate = (timestamp) => {
 
       <div className="cart-center">
   <div className="cart-panel">
-  {cart.length === 0 ? (
-    <p>ยังไม่มีสินค้า</p>
-  ) : (
-        cart.map((item, index) => (
-  <div key={index} className="cart-item">
-    <span>
-      {item.name} x {item.qty} - {item.price * item.qty} บาท
-    </span>
+    {cart.length === 0 ? (
+      <p>ยังไม่มีสินค้า</p>
+    ) : (
+      <>
+        {cart.map((item, index) => (
+          <div key={index} className="cart-item">
+            <span>
+              {item.name} x {item.qty} - {item.price * item.qty} บาท
+            </span>
 
-    <button
-      className="delete-btn"
-      onClick={() => removeFromCart(item.id)}
-    >
-      ลบ
+            <button
+              className="delete-btn"
+              onClick={() => removeFromCart(item.id)}
+            >
+              ลบ
+            </button>
+          </div>
+        ))}
+
+        <div className="table-input-box">
+          <label>เลขโต๊ะ</label>
+          <input
+            type="number"
+            placeholder="เช่น 1"
+            value={tableNumber}
+            onChange={(e) => setTableNumber(e.target.value)}
+            className="table-input"
+          />
+        </div>
+      </>
+    )}
+
+    <h3>รวม {total} บาท</h3>
+
+    <button className="btn" onClick={saveOrder}>
+      บันทึกออเดอร์
     </button>
-  </div>
-))
-      )}
-
-      <h3>รวม {total} บาท</h3>
-
-      <button
-  className="btn"
-  onClick={saveOrder}
->
-  บันทึกออเดอร์
-</button>
   </div>
 </div>
 
@@ -296,6 +313,10 @@ const formatDate = (timestamp) => {
   key={order.id}
   className="order-card"
 >
+<p>
+  <strong>โต๊ะ:</strong>{" "}
+  {order.tableNumber || "-"}
+</p>
           <p>
             <strong>สถานะ:</strong>{" "}
             {order.status}
