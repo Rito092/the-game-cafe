@@ -271,24 +271,30 @@ function Home({ user, onLogout }) {
                     </p>
                 </div>
             </div>
+<div className="dashboard">
+    {user?.role === "owner" && (
+        <Card title="💰 ยอดขายรวม" value={`${totalSales} บาท`} />
+    )}
 
-            <div className="dashboard">
-                <Card title="💰 ยอดขายรวม" value={`${totalSales} บาท`} />
-                <Card title="📋 ออเดอร์ทั้งหมด" value={orders.length} />
-                <Card title="🟡 กำลังทำ" value={pendingOrders} />
-                <Card title="🔵 เสร็จแล้ว" value={completedOrders} />
-                <Card title="🟢 เสิร์ฟแล้ว" value={servedOrders} />
-            </div>
-            <div className="report-toggle-box">
-                <button
-                    className="btn"
-                    onClick={() => setShowDailyReport(!showDailyReport)}
-                >
-                    {showDailyReport ? "ซ่อนรายงานยอดขายรายวัน" : "ดูรายงานยอดขายรายวัน"}
-                </button>
-            </div>
+    <Card title="📋 ออเดอร์ทั้งหมด" value={orders.length} />
+    <Card title="🟡 กำลังทำ" value={pendingOrders} />
+    <Card title="🔵 เสร็จแล้ว" value={completedOrders} />
+    <Card title="🟢 เสิร์ฟแล้ว" value={servedOrders} />
+</div>
+            {user?.role === "owner" && (
+    <div className="report-toggle-box">
+        <button
+            className="btn"
+            onClick={() => setShowDailyReport(!showDailyReport)}
+        >
+            {showDailyReport
+                ? "ซ่อนรายงานยอดขายรายวัน"
+                : "ดูรายงานยอดขายรายวัน"}
+        </button>
+    </div>
+)}
 
-            {showDailyReport && (
+            {user?.role === "owner" && showDailyReport && (
                 <div className="report-panel">
                     <h2 className="section-title">
                         📊 รายงานวันนี้
@@ -308,84 +314,88 @@ function Home({ user, onLogout }) {
                 </div>
             )}
 
+{user?.role === "owner" && (
+<>
+    <h2>🍔 เมนู</h2>
 
-            <h2>🍔 เมนู</h2>
+    <div className="menu-grid">
+        {menu.map((item) => (
+            <div
+                key={item.id}
+                className="menu-card"
+            >
+                <img
+                    src={menuImages[item.name?.trim().toLowerCase()]}
+                    alt={item.name}
+                    className="menu-image"
+                />
 
-            <div className="menu-grid">
-                {menu.map((item) => (
-                    <div
-                        key={item.id}
-                        className="menu-card"
-                    >
-                        <img
-                            src={menuImages[item.name?.trim().toLowerCase()]}
-                            alt={item.name}
-                            className="menu-image"
+                <h3>{item.name}</h3>
+
+                <p>{item.price} บาท</p>
+
+                <button
+                    className="btn"
+                    onClick={() => addToCart(item)}
+                >
+                    เพิ่มลงตะกร้า
+                </button>
+            </div>
+        ))}
+    </div>
+
+    <h2 className="section-title">
+        🛒 ตะกร้าสินค้า
+    </h2>
+
+    <div className="cart-center">
+        <div className="cart-panel">
+            {cart.length === 0 ? (
+                <p>ยังไม่มีสินค้า</p>
+            ) : (
+                <>
+                    {cart.map((item, index) => (
+                        <div key={index} className="cart-item">
+                            <span>
+                                {item.name} x {item.qty} - {item.price * item.qty} บาท
+                            </span>
+
+                            <button
+                                className="delete-btn"
+                                onClick={() => removeFromCart(item.id)}
+                            >
+                                ลบ
+                            </button>
+                        </div>
+                    ))}
+
+                    <div className="table-input-box">
+                        <label>เลขโต๊ะ</label>
+
+                        <input
+                            type="number"
+                            placeholder="เช่น 1"
+                            value={tableNumber}
+                            onChange={(e) => setTableNumber(e.target.value)}
+                            className="table-input"
                         />
-
-                        <h3>{item.name}</h3>
-
-                        <p>{item.price} บาท</p>
-
-                        <button
-                            className="btn"
-                            onClick={() => addToCart(item)}
-                        >
-                            เพิ่มลงตะกร้า
-                        </button>
                     </div>
-                ))}
-            </div>
-            <h2 className="section-title">
-                🛒 ตะกร้าสินค้า
-            </h2>
+                </>
+            )}
 
-            <div className="cart-center">
-                <div className="cart-panel">
-                    {cart.length === 0 ? (
-                        <p>ยังไม่มีสินค้า</p>
-                    ) : (
-                        <>
-                            {cart.map((item, index) => (
-                                <div key={index} className="cart-item">
-                                    <span>
-                                        {item.name} x {item.qty} - {item.price * item.qty} บาท
-                                    </span>
+            <h3>รวม {total} บาท</h3>
 
-                                    <button
-                                        className="delete-btn"
-                                        onClick={() => removeFromCart(item.id)}
-                                    >
-                                        ลบ
-                                    </button>
-                                </div>
-                            ))}
-
-                            <div className="table-input-box">
-                                <label>เลขโต๊ะ</label>
-                                <input
-                                    type="number"
-                                    placeholder="เช่น 1"
-                                    value={tableNumber}
-                                    onChange={(e) => setTableNumber(e.target.value)}
-                                    className="table-input"
-                                />
-                            </div>
-                        </>
-                    )}
-
-                    <h3>รวม {total} บาท</h3>
-
-                    <button
-                        className="btn"
-                        onClick={saveOrder}
-                        disabled={cart.length === 0}
-                    >
-                        บันทึกออเดอร์
-                    </button>
-                </div>
-            </div>
-
+            <button
+                className="btn"
+                onClick={saveOrder}
+                disabled={cart.length === 0}
+            >
+                บันทึกออเดอร์
+            </button>
+        </div>
+    </div>
+</>
+)}
             <h2 className="section-title">
                 📋 Orders
             </h2>
@@ -434,67 +444,60 @@ function Home({ user, onLogout }) {
                         {order.total} บาท
                     </p>
                     <p>
-                        <strong>เวลา:</strong>{" "}
-                        {formatDate(order.createdAt)}
-                    </p>
-                    <div className="order-buttons">
-                        <button
-                            className={
-                                order.status === "กำลังทำ"
-                                    ? "btn btn-pending"
-                                    : "btn"
-                            }
-                            onClick={() =>
-                                updateOrderStatus(
-                                    order.id,
-                                    "กำลังทำ"
-                                )
-                            }
-                        >
-                            กำลังทำ
-                        </button>
+    <strong>เวลา:</strong>{" "}
+    {formatDate(order.createdAt)}
+</p>
 
-                        <button
-                            className={
-                                order.status === "เสร็จแล้ว"
-                                    ? "btn btn-complete"
-                                    : "btn"
-                            }
-                            onClick={() =>
-                                updateOrderStatus(
-                                    order.id,
-                                    "เสร็จแล้ว"
-                                )
-                            }
-                        >
-                            เสร็จแล้ว
-                        </button>
+    <div className="order-buttons">
+        <button
+            className={
+                order.status === "กำลังทำ"
+                    ? "btn btn-pending"
+                    : "btn"
+            }
+            onClick={() =>
+                updateOrderStatus(order.id, "กำลังทำ")
+            }
+        >
+            กำลังทำ
+        </button>
 
-                        <button
-                            className={
-                                order.status === "เสิร์ฟแล้ว"
-                                    ? "btn btn-served"
-                                    : "btn"
-                            }
-                            onClick={() =>
-                                updateOrderStatus(
-                                    order.id,
-                                    "เสิร์ฟแล้ว"
-                                )
-                            }
-                        >
-                            เสิร์ฟแล้ว
-                        </button>
-                    </div>
+        <button
+            className={
+                order.status === "เสร็จแล้ว"
+                    ? "btn btn-complete"
+                    : "btn"
+            }
+            onClick={() =>
+                updateOrderStatus(order.id, "เสร็จแล้ว")
+            }
+        >
+            เสร็จแล้ว
+        </button>
 
-                    <button
-                        className="delete-btn"
-                        onClick={() =>
-                            deleteOrder(order.id)
-                        }
-                    >
-                        🗑 ลบ
-                    </button>
+        <button
+            className={
+                order.status === "เสิร์ฟแล้ว"
+                    ? "btn btn-served"
+                    : "btn"
+            }
+            onClick={() =>
+                updateOrderStatus(order.id, "เสิร์ฟแล้ว")
+            }
+        >
+            เสิร์ฟแล้ว
+        </button>
+    </div>
+
+
+                    {user?.role === "owner" && (
+    <button
+        className="delete-btn"
+        onClick={() => deleteOrder(order.id)}
+    >
+        🗑 ลบ
+    </button>
+)}
 
                     <hr />
 
