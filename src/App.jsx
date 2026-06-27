@@ -23,6 +23,7 @@ function App() {
   const [menu, setMenu] = useState([]);
   const [tableNumber, setTableNumber] = useState("");
   const [searchTable, setSearchTable] = useState("");
+  const [showDailyReport, setShowDailyReport] = useState(false);
 const menuImages = {
   americano: americanoImg,
   cappuccino: cappuccinoImg,
@@ -78,7 +79,36 @@ const menuImages = {
   const servedOrders = orders.filter(
     (o) => o.status === "เสิร์ฟแล้ว"
   ).length;
+const getDateKey = (timestamp) => {
+  if (!timestamp) return "ไม่ทราบวันที่";
 
+  const date = timestamp.toDate
+    ? timestamp.toDate()
+    : new Date(timestamp);
+
+  return date.toLocaleDateString("th-TH", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+};
+
+const today = new Date().toLocaleDateString("th-TH");
+
+const todayOrders = orders.filter((order) => {
+  if (!order.createdAt) return false;
+
+  const orderDate = order.createdAt.toDate
+    ? order.createdAt.toDate()
+    : new Date(order.createdAt);
+
+  return orderDate.toLocaleDateString("th-TH") === today;
+});
+
+const todaySales = todayOrders.reduce(
+  (sum, order) => sum + Number(order.total || 0),
+  0
+);
   const fetchMenu = async () => {
     try {
       const querySnapshot = await getDocs(
@@ -237,6 +267,35 @@ const formatDate = (timestamp) => {
         <Card title="🔵 เสร็จแล้ว" value={completedOrders} />
         <Card title="🟢 เสิร์ฟแล้ว" value={servedOrders} />
       </div>
+<div className="report-toggle-box">
+  <button
+    className="btn"
+    onClick={() => setShowDailyReport(!showDailyReport)}
+  >
+    {showDailyReport ? "ซ่อนรายงานยอดขายรายวัน" : "ดูรายงานยอดขายรายวัน"}
+  </button>
+</div>
+
+{showDailyReport && (
+  <div className="report-panel">
+    <h2 className="section-title">
+      📊 รายงานวันนี้
+    </h2>
+
+    <div className="report-card">
+      <h3>{today}</h3>
+
+      <p>
+        <strong>ยอดขายวันนี้:</strong> {todaySales} บาท
+      </p>
+
+      <p>
+        <strong>จำนวนออเดอร์:</strong> {todayOrders.length} ออเดอร์
+      </p>
+    </div>
+  </div>
+)}
+
 
       <h2>🍔 เมนู</h2>
 
