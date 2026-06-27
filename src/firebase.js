@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC3JF5ZqhLPD22uNgygIGnEC6O0uQnmoh0",
@@ -8,11 +9,10 @@ const firebaseConfig = {
   storageBucket: "restaurant-system-5759e.firebasestorage.app",
   messagingSenderId: "666764964578",
   appId: "1:666764964578:web:9e93a06351c4da6c1964bb",
-  measurementId: "G-G9SHT56PMY"
+  measurementId: "G-G9SHT56PMY",
 };
 
-// init app
 const app = initializeApp(firebaseConfig);
 
-// database export ตัวเดียวพอ
 export const db = getFirestore(app);
+export const auth = getAuth(app);
