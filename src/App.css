@@ -419,3 +419,59 @@ h2,
   text-align: center;
   box-shadow: none;
 }
+@media print {
+
+  .btn {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  .container {
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+
+  .menu-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+
+  .menu-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+.menu-card {
+  padding: 12px !important;
+  min-height: auto !important;
+}
+
+.menu-card h3 {
+  font-size: 20px;
+  margin: 8px 0;
+}
+
+.menu-card p {
+  font-size: 14px;
+  margin: 6px 0;
+}
+
+.menu-card img,
+.qr-image {
+  width: 140px !important;
+  height: 140px !important;
+}
+
+.menu-grid {
+  gap: 10px !important;
+}
+
+@page {
+  size: A4 portrait;
+  margin: 8mm;
+}

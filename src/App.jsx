@@ -7,7 +7,7 @@ import Landing from "./Landing";
 import Login from "./Login";
 import Home from "./Home";
 import Customer from "./Customer";
-
+import QRPage from "./QRPage";
 function App() {
   const [user, setUser] = useState(null);
 
@@ -23,7 +23,7 @@ function App() {
 
       {/* ลูกค้า */}
       <Route path="/table/:tableNumber" element={<Customer />} />
-
+<Route path="/qr" element={<QRPage />} />
       {/* Login */}
       <Route
         path="/login"
