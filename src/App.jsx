@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { signOut } from "firebase/auth";
 import { auth } from "./firebase";
 
-import Login from "./Login.jsx";
-import Home from "./Home.jsx";
+import Landing from "./Landing";
+import Login from "./Login";
+import Home from "./Home";
+import Customer from "./Customer";
 
 function App() {
   const [user, setUser] = useState(null);
@@ -13,11 +16,39 @@ function App() {
     setUser(null);
   };
 
-  if (!user) {
-    return <Login onLogin={setUser} />;
-  }
+  return (
+    <Routes>
+      {/* หน้าแรก */}
+      <Route path="/" element={<Landing />} />
 
-  return <Home user={user} onLogout={handleLogout} />;
+      {/* ลูกค้า */}
+      <Route path="/table/:tableNumber" element={<Customer />} />
+
+      {/* Login */}
+      <Route
+        path="/login"
+        element={
+          !user ? (
+            <Login onLogin={setUser} />
+          ) : (
+            <Navigate to="/home" replace />
+          )
+        }
+      />
+
+      {/* Owner / Employee */}
+      <Route
+        path="/home"
+        element={
+          user ? (
+            <Home user={user} onLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+    </Routes>
+  );
 }
 
 export default App;

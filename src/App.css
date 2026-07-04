@@ -7,9 +7,11 @@ body{
 }
 
 .container {
+  width: 100%;
   max-width: 1200px;
   margin: auto;
-  padding: 24px;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .title,
@@ -322,7 +324,7 @@ h2,
   }
 
   .menu-image {
-  height: 200px;
+  height: 180px;
 }
 
   .cart-panel {
