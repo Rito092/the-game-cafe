@@ -15,6 +15,7 @@ import {
     serverTimestamp,
     query,
     orderBy,
+    onSnapshot,
 } from "firebase/firestore";
 import logo from "./assets/menu/logo.png";
 function Home({ user, onLogout }) {
@@ -176,7 +177,7 @@ function Home({ user, onLogout }) {
             alert("บันทึกออเดอร์สำเร็จ");
             setCart([]);
             setTableNumber("");
-            fetchOrders();
+           
         } catch (error) {
             console.error(error);
         }
@@ -215,9 +216,28 @@ function Home({ user, onLogout }) {
     };
 
     useEffect(() => {
-        fetchMenu();
-        fetchOrders();
-    }, []);
+    fetchMenu();
+
+    const q = query(
+        collection(db, "orders"),
+        orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const orderList = [];
+
+        snapshot.forEach((doc) => {
+            orderList.push({
+                id: doc.id,
+                ...doc.data(),
+            });
+        });
+
+        setOrders(orderList);
+    });
+
+    return () => unsubscribe();
+}, []);
     const filteredOrders = searchTable
         ? orders.filter(
             (order) =>
@@ -502,13 +522,39 @@ function Home({ user, onLogout }) {
                     <hr />
 
                     <div className="order-items">
-                        {order.items?.map((item, index) => (
-                            <div key={index}>
-                                • {item.name} x {item.qty || 1} (
-                                {item.price * (item.qty || 1)} บาท)
-                            </div>
-                        ))}
-                    </div>
+  {order.items?.map((item, index) => (
+    <div
+      key={index}
+      style={{ marginBottom: "12px" }}
+    >
+      <div>
+        • {item.name}
+
+        {item.sweetness && <> ({item.sweetness})</>}
+
+        {item.ice && <> 🧊 {item.ice}</>}
+
+        {" "}x {item.qty || 1}
+
+        {" "}
+        ({item.price * (item.qty || 1)} บาท)
+      </div>
+
+      {item.note && (
+        <div
+          style={{
+            color: "#dc2626",
+            marginLeft: "18px",
+            fontWeight: "bold",
+          }}
+        >
+          📝 {item.note}
+        </div>
+      )}
+    </div>
+))}
+</div>
+
                 </div>
             ))}
         </div>
