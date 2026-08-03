@@ -9,6 +9,8 @@ import matchaImg from "./assets/menu/matcha.png";
 
 import { getMenu } from "./services/menuService";
 import { createOrder } from "./services/orderService";
+import { useCategories } from "./hooks/useCategories";
+import CategoryModal from "./components/CategoryModal";
 
 export default function Customer() {
   const { tableNumber } = useParams();
@@ -17,10 +19,14 @@ export default function Customer() {
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState(null);
-const [sweetness, setSweetness] = useState("100%");
-const [ice, setIce] = useState("ปกติ");
-const [note, setNote] = useState("");
-const [ordering, setOrdering] = useState(false);
+  const [sweetness, setSweetness] = useState("100%");
+  const [ice, setIce] = useState("ปกติ");
+  const [note, setNote] = useState("");
+  const [ordering, setOrdering] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+
+  const { categories, loading: categoriesLoading } = useCategories();
+
   const menuImages = {
     americano: americanoImg,
     cappuccino: cappuccinoImg,
@@ -42,76 +48,78 @@ const [ordering, setOrdering] = useState(false);
       setLoading(false);
     }
   };
-const addToCart = (item, sweetness, ice) => {
-  setCart((prev) => {
-    const exist = prev.find(
-  (i) =>
-    i.id === item.id &&
-    i.sweetness === sweetness &&
-    i.ice === ice
-);
 
-    if (exist) {
-      return prev.map((i) =>
-       i.id === item.id &&
-i.sweetness === sweetness &&
-i.ice === ice
-          ? {
-              ...i,
-              qty: i.qty + 1,
-            }
-          : i
+  const addToCart = (item, sweetness, ice) => {
+    setCart((prev) => {
+      const exist = prev.find(
+        (i) =>
+          i.id === item.id &&
+          i.sweetness === sweetness &&
+          i.ice === ice
       );
-    }
 
-   return [
-  ...prev,
-  {
-    ...item,
+      if (exist) {
+        return prev.map((i) =>
+          i.id === item.id &&
+          i.sweetness === sweetness &&
+          i.ice === ice
+            ? {
+                ...i,
+                qty: i.qty + 1,
+              }
+            : i
+        );
+      }
+
+      return [
+        ...prev,
+        {
+          ...item,
+          sweetness,
+          ice,
+          qty: 1,
+        },
+      ];
+    });
+  };
+
+  const removeFromCart = (
+    id,
     sweetness,
-    ice,
-    qty: 1,
-  },
-];
-  });
-};
-const removeFromCart = (
-  id,
-  sweetness,
-  ice
-) => {
-  setCart((prev) => {
-    const exist = prev.find(
-  (i) =>
-    i.id === id &&
-    i.sweetness === sweetness &&
-    i.ice === ice
-);
-    if (!exist) return prev;
+    ice
+  ) => {
+    setCart((prev) => {
+      const exist = prev.find(
+        (i) =>
+          i.id === id &&
+          i.sweetness === sweetness &&
+          i.ice === ice
+      );
+      if (!exist) return prev;
 
-    if (exist.qty === 1) {
-  return prev.filter(
-    (i) =>
-      !(
+      if (exist.qty === 1) {
+        return prev.filter(
+          (i) =>
+            !(
+              i.id === id &&
+              i.sweetness === sweetness &&
+              i.ice === ice
+            )
+        );
+      }
+
+      return prev.map((i) =>
         i.id === id &&
         i.sweetness === sweetness &&
         i.ice === ice
-      )
-  );
-}
-
-    return prev.map((i) =>
-  i.id === id &&
-  i.sweetness === sweetness &&
-  i.ice === ice
-    ? {
-        ...i,
-        qty: i.qty - 1,
-      }
-    : i
-);
-  });
-};
+          ? {
+              ...i,
+              qty: i.qty - 1,
+            }
+          : i
+      );
+    });
+  };
 
   const total = cart.reduce(
     (sum, item) => sum + item.price * item.qty,
@@ -125,7 +133,7 @@ const removeFromCart = (
     }
 
     try {
-        setOrdering(true);
+      setOrdering(true);
       await createOrder({
         tableNumber: Number(tableNumber),
         items: cart,
@@ -136,353 +144,387 @@ const removeFromCart = (
 
       setCart([]);
       setOrdering(false);
-          } catch (error) {
-            setOrdering(false);
+    } catch (error) {
+      setOrdering(false);
       console.error(error);
       alert("เกิดข้อผิดพลาดในการสั่งอาหาร");
     }
   };
 
- return (
-  <>
-    <div className="container">
-      <div className="logo-header">
-        <h1 className="title">THE GAME CAFE</h1>
-        <p className="subtitle">Coffee • Food • Gaming</p>
-      </div>
-
-      <div className="report-panel">
-        <h2>โต๊ะ {tableNumber}</h2>
-      </div>
-
-      <h2 className="section-title">🍔 เมนูอาหารและเครื่องดื่ม</h2>
-
-      {loading ? (
-        <p style={{ textAlign: "center" }}>กำลังโหลดเมนู...</p>
-      ) : (
-        <div className="menu-grid">
-          {menu.map((item) => (
-            <div key={item.id} className="menu-card">
-              <img
-                src={
-                  menuImages[
-                    item.name?.trim().toLowerCase()
-                  ]
-                }
-                alt={item.name}
-                className="menu-image"
-              />
-
-              <h3>{item.name}</h3>
-
-              <p>{item.price} บาท</p>
-
-             {(() => {
-  const current = cart.find((i) => i.id === item.id);
-
-  return current ? (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        gap: "10px",
-        marginTop: "12px",
-      }}
-    >
-      <button
-        className="btn"
-        onClick={() => {
-  const current = cart.find((i) => i.id === item.id);
-
-  removeFromCart(
-    current.id,
-    current?.sweetness,
-    current?.ice
-  );
-}}
-      >
-        −
-      </button>
-
-      <strong style={{ minWidth: "24px" }}>
-        {current.qty}
-      </strong>
-
-      <button
-        className="btn"
-        onClick={() =>
-          addToCart(
-            item,
-            current.sweetness,
-            current.ice
-          )
-        }
-      >
-        +
-      </button>
-    </div>
-  ) : (
-    <button
-      className="btn"
-      onClick={() => {
-        setSelectedItem(item);
-        setSweetness("100%");
-        setIce("ปกติ");
-        setNote("");
-      }}
-    >
-      เพิ่มลงตะกร้า
-    </button>
-  );
-})()}
-            </div>
-          ))}
+  return (
+    <>
+      <div className="container">
+        <div className="logo-header">
+          <h1 className="title">THE GAME CAFE</h1>
+          <p className="subtitle">Coffee • Food • Gaming</p>
         </div>
-      )}
-        
-      <h2 className="section-title">
-        🛒 ตะกร้าสินค้า
-      </h2>
 
-      <div className="cart-center">
-        <div className="cart-panel">
-          {cart.length === 0 ? (
-            <p>ยังไม่มีสินค้า</p>
-          ) : (
-            <>
-              {cart.map((item) => (
-  <div
-    key={item.id}
-    className="cart-item"
-    style={{
-      justifyContent: "space-between",
-      borderBottom: "1px solid #e5e7eb",
-      paddingBottom: "12px",
-      marginBottom: "12px",
-    }}
-  >
-    <div>
-  <strong>{item.name}</strong>
+        <div className="report-panel">
+          <h2>โต๊ะ {tableNumber}</h2>
+        </div>
 
-  <p
-  style={{
-    marginTop: "6px",
-    color: "#2563eb",
-    fontSize: "14px",
-    fontWeight: "bold",
-  }}
->
-  ความหวาน {item.sweetness}
-</p>
+        <h2 className="section-title">🍔 เมนูอาหารและเครื่องดื่ม</h2>
 
-<p
-  style={{
-    marginTop: "4px",
-    color: "#06b6d4",
-    fontSize: "14px",
-    fontWeight: "bold",
-  }}
->
-  🧊 {item.ice}
-</p>
+        {categoriesLoading ? (
+          <p style={{ textAlign: "center" }}>กำลังโหลดหมวดหมู่...</p>
+        ) : (
+          <div className="menu-grid" style={{ marginBottom: "24px" }}>
+            {categories.map((category) => (
+              <div
+                key={category.id}
+                className="menu-card"
+                style={{ cursor: "pointer" }}
+                onClick={() => setSelectedCategory(category)}
+              >
+                <h3>{category.name}</h3>
+              </div>
+            ))}
+          </div>
+        )}
 
-{item.note && (
-  <p
-    style={{
-      marginTop: "6px",
-      color: "#dc2626",
-      fontSize: "14px",
-      fontWeight: "bold",
-    }}
-  >
-    📝 {item.note}
-  </p>
-)}
+        {loading ? (
+          <p style={{ textAlign: "center" }}>กำลังโหลดเมนู...</p>
+        ) : (
+          <div className="menu-grid">
+            {menu.map((item) => (
+              <div key={item.id} className="menu-card">
+                <img
+                  src={
+                    menuImages[
+                      item.name?.trim().toLowerCase()
+                    ]
+                  }
+                  alt={item.name}
+                  className="menu-image"
+                />
 
-<p
-  style={{
-    marginTop: "6px",
-    color: "#666",
-    fontWeight: "bold",
-  }}
->
-  จำนวน {item.qty} รายการ
-</p>
-</div>
-    <div
-      style={{
-        textAlign: "right",
-      }}
-    >
-      <strong>
-        {item.price * item.qty} บาท
-      </strong>
+                <h3>{item.name}</h3>
 
-      <div
-        style={{
-          fontSize: "13px",
-          color: "#666",
-        }}
-      >
-        {item.price} × {item.qty}
+                <p>{item.price} บาท</p>
+
+                {(() => {
+                  const current = cart.find((i) => i.id === item.id);
+
+                  return current ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        gap: "10px",
+                        marginTop: "12px",
+                      }}
+                    >
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          const current = cart.find((i) => i.id === item.id);
+
+                          removeFromCart(
+                            current.id,
+                            current?.sweetness,
+                            current?.ice
+                          );
+                        }}
+                      >
+                        −
+                      </button>
+
+                      <strong style={{ minWidth: "24px" }}>
+                        {current.qty}
+                      </strong>
+
+                      <button
+                        className="btn"
+                        onClick={() =>
+                          addToCart(
+                            item,
+                            current.sweetness,
+                            current.ice
+                          )
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="btn"
+                      onClick={() => {
+                        setSelectedItem(item);
+                        setSweetness("100%");
+                        setIce("ปกติ");
+                        setNote("");
+                      }}
+                    >
+                      เพิ่มลงตะกร้า
+                    </button>
+                  );
+                })()}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <h2 className="section-title">
+          🛒 ตะกร้าสินค้า
+        </h2>
+
+        <div className="cart-center">
+          <div className="cart-panel">
+            {cart.length === 0 ? (
+              <p>ยังไม่มีสินค้า</p>
+            ) : (
+              <>
+                {cart.map((item) => (
+                  <div
+                    key={item.id}
+                    className="cart-item"
+                    style={{
+                      justifyContent: "space-between",
+                      borderBottom: "1px solid #e5e7eb",
+                      paddingBottom: "12px",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    <div>
+                      <strong>{item.name}</strong>
+
+                      <p
+                        style={{
+                          marginTop: "6px",
+                          color: "#2563eb",
+                          fontSize: "14px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        ความหวาน {item.sweetness}
+                      </p>
+
+                      <p
+                        style={{
+                          marginTop: "4px",
+                          color: "#06b6d4",
+                          fontSize: "14px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        🧊 {item.ice}
+                      </p>
+
+                      {item.note && (
+                        <p
+                          style={{
+                            marginTop: "6px",
+                            color: "#dc2626",
+                            fontSize: "14px",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          📝 {item.note}
+                        </p>
+                      )}
+
+                      <p
+                        style={{
+                          marginTop: "6px",
+                          color: "#666",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        จำนวน {item.qty} รายการ
+                      </p>
+                    </div>
+                    <div
+                      style={{
+                        textAlign: "right",
+                      }}
+                    >
+                      <strong>
+                        {item.price * item.qty} บาท
+                      </strong>
+
+                      <div
+                        style={{
+                          fontSize: "13px",
+                          color: "#666",
+                        }}
+                      >
+                        {item.price} × {item.qty}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <hr />
+                <h3>รวม {total} บาท</h3>
+
+                <button
+                  className="btn"
+                  onClick={confirmOrder}
+                >
+                  ยืนยันการสั่งซื้อ
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-))}
-<hr />
-              <h3>รวม {total} บาท</h3>
+
+      {selectedItem && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 999,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              width: "360px",
+              maxWidth: "90%",
+              borderRadius: "16px",
+              padding: "24px",
+            }}
+          >
+            <img
+              src={
+                menuImages[
+                  selectedItem.name?.trim().toLowerCase()
+                ]
+              }
+              alt={selectedItem.name}
+              style={{
+                width: "100%",
+                height: "180px",
+                objectFit: "cover",
+                borderRadius: "12px",
+                marginBottom: "16px",
+              }}
+            />
+            <h2>{selectedItem.name}</h2>
+            <p
+              style={{
+                color: "#666",
+                textAlign: "center",
+                marginBottom: "10px",
+              }}
+            >
+              {selectedItem.description || "เครื่องดื่มคุณภาพจาก THE GAME CAFE"}
+            </p>
+            <p>{selectedItem.price} บาท</p>
+
+            <h3>เลือกระดับความหวาน</h3>
+
+            <select
+              value={sweetness}
+              onChange={(e) => setSweetness(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px",
+                borderRadius: "8px",
+                marginBottom: "20px",
+              }}
+            >
+              <option>0%</option>
+              <option>25%</option>
+              <option>50%</option>
+              <option>75%</option>
+              <option>100%</option>
+            </select>
+            <h3 style={{ marginTop: "20px" }}>
+              เลือกระดับน้ำแข็ง
+            </h3>
+
+            <select
+              value={ice}
+              onChange={(e) => setIce(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px",
+                borderRadius: "8px",
+                marginBottom: "20px",
+              }}
+            >
+              <option>ไม่ใส่น้ำแข็ง</option>
+              <option>น้ำแข็งน้อย</option>
+              <option>ปกติ</option>
+              <option>น้ำแข็งมาก</option>
+            </select>
+            <h3 style={{ marginTop: "20px" }}>
+              หมายเหตุเพิ่มเติม
+            </h3>
+
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="เช่น ไม่ใส่วิป / เพิ่มช็อต / นมโอ๊ต"
+              style={{
+                width: "100%",
+                minHeight: "80px",
+                padding: "10px",
+                borderRadius: "10px",
+                resize: "none",
+                marginBottom: "20px",
+                boxSizing: "border-box",
+              }}
+            />
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: "20px",
+              }}
+            >
+              <button
+                className="delete-btn"
+                onClick={() => setSelectedItem(null)}
+              >
+                ยกเลิก
+              </button>
 
               <button
                 className="btn"
-                onClick={confirmOrder}
+                onClick={() => {
+                  addToCart(
+                    {
+                      ...selectedItem,
+                      note,
+                    },
+                    sweetness,
+                    ice
+                  );
+
+                  setSelectedItem(null);
+                }}
               >
-                ยืนยันการสั่งซื้อ
+                เพิ่มลงตะกร้า
               </button>
-            </>
-          )}
-                  </div>
-      </div>
-    </div>
-    {selectedItem && (
-  <div
-    style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,0.5)",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      zIndex: 999,
-    }}
-  >
-    <div
-      style={{
-        background: "#fff",
-        width: "360px",
-        maxWidth: "90%",
-        borderRadius: "16px",
-        padding: "24px",
-      }}
-    >
-      <img
-  src={
-    menuImages[
-      selectedItem.name?.trim().toLowerCase()
-    ]
-  }
-  alt={selectedItem.name}
-  style={{
-    width: "100%",
-    height: "180px",
-    objectFit: "cover",
-    borderRadius: "12px",
-    marginBottom: "16px",
-  }}
-/>
-<h2>{selectedItem.name}</h2>
-<p
-  style={{
-    color: "#666",
-    textAlign: "center",
-    marginBottom: "10px",
-  }}
->
-  {selectedItem.description || "เครื่องดื่มคุณภาพจาก THE GAME CAFE"}
-</p>
-      <p>{selectedItem.price} บาท</p>
+            </div>
+          </div>
+        </div>
+      )}
 
-      <h3>เลือกระดับความหวาน</h3>
-
-      <select
-        value={sweetness}
-        onChange={(e) => setSweetness(e.target.value)}
-        style={{
-          width: "100%",
-          padding: "10px",
-          borderRadius: "8px",
-          marginBottom: "20px",
+      <CategoryModal
+        category={selectedCategory}
+        items={
+          selectedCategory
+            ? menu.filter((item) => item.categoryId === selectedCategory.id)
+            : []
+        }
+        onClose={() => setSelectedCategory(null)}
+        onSelectItem={(item) => {
+          setSelectedCategory(null); // ปิด category modal ก่อนเสมอ กัน modal ซ้อน
+          setSelectedItem(item);
+          setSweetness("100%");
+          setIce("ปกติ");
+          setNote("");
         }}
-      >
-        <option>0%</option>
-        <option>25%</option>
-        <option>50%</option>
-        <option>75%</option>
-        <option>100%</option>
-      </select>
-      <h3 style={{ marginTop: "20px" }}>
-    เลือกระดับน้ำแข็ง
-</h3>
-
-<select
-    value={ice}
-    onChange={(e) => setIce(e.target.value)}
-    style={{
-        width: "100%",
-        padding: "10px",
-        borderRadius: "8px",
-        marginBottom: "20px",
-    }}
->
-    <option>ไม่ใส่น้ำแข็ง</option>
-    <option>น้ำแข็งน้อย</option>
-    <option>ปกติ</option>
-    <option>น้ำแข็งมาก</option>
-</select>
-<h3 style={{ marginTop: "20px" }}>
-    หมายเหตุเพิ่มเติม
-</h3>
-
-<textarea
-    value={note}
-    onChange={(e) => setNote(e.target.value)}
-    placeholder="เช่น ไม่ใส่วิป / เพิ่มช็อต / นมโอ๊ต"
-    style={{
-        width: "100%",
-        minHeight: "80px",
-        padding: "10px",
-        borderRadius: "10px",
-        resize: "none",
-        marginBottom: "20px",
-        boxSizing: "border-box",
-    }}
-/>
-<div
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    marginTop: "20px",
-  }}
->
-  <button
-    className="delete-btn"
-    onClick={() => setSelectedItem(null)}
-  >
-    ยกเลิก
-  </button>
-
-  <button
-  className="btn"
-  onClick={() => {
-   addToCart(
-    {
-        ...selectedItem,
-        note,
-    },
-    sweetness,
-    ice
-);
-
-    setSelectedItem(null);
-  }}
->
-  เพิ่มลงตะกร้า
-</button>
-</div>
-    </div>
-  </div>
-)}
-
-</>
+      />
+    </>
   );
 }

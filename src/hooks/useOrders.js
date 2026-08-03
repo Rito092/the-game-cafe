@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "../services/firebase";
+import { db } from "../firebase";
 
 export const useOrders = () => {
   const [orders, setOrders] = useState([]);

@@ -1,5 +1,6 @@
 import "./App.css";
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { db } from "./firebase";
 import americanoImg from "./assets/menu/americano.png";
 import cappuccinoImg from "./assets/menu/cappuccino.png";
@@ -265,6 +266,14 @@ function Home({ user, onLogout }) {
                 <span>
                     เข้าสู่ระบบ: {user?.email} ({user?.role})
                 </span>
+
+                <Link
+                    to="/menu-management"
+                    className="btn"
+                    style={{ marginLeft: "10px" }}
+                >
+                    จัดการเมนู
+                </Link>
 
                 <button
                     className="delete-btn"
