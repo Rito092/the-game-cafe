@@ -69,9 +69,6 @@ function Home({ user, onLogout }) {
         (o) => o.status === "กำลังทำ"
     ).length;
 
-    const completedOrders = orders.filter(
-        (o) => o.status === "เสร็จแล้ว"
-    ).length;
 
     const servedOrders = orders.filter(
         (o) => o.status === "เสิร์ฟแล้ว"
@@ -314,7 +311,7 @@ function Home({ user, onLogout }) {
 
     <Card title="📋 ออเดอร์ทั้งหมด" value={orders.length} />
     <Card title="🟡 กำลังทำ" value={pendingOrders} />
-    <Card title="🔵 เสร็จแล้ว" value={completedOrders} />
+    
     <Card title="🟢 เสิร์ฟแล้ว" value={servedOrders} />
 </div>
             {user?.role === "owner" && (
@@ -465,11 +462,7 @@ function Home({ user, onLogout }) {
                             </div>
                         )}
 
-                        {order.status === "เสร็จแล้ว" && (
-                            <div className="status-complete">
-                                🔵 เสร็จแล้ว
-                            </div>
-                        )}
+                    
 
                         {order.status === "เสิร์ฟแล้ว" && (
                             <div className="status-served">
@@ -500,20 +493,7 @@ function Home({ user, onLogout }) {
         >
             กำลังทำ
         </button>
-
-        <button
-            className={
-                order.status === "เสร็จแล้ว"
-                    ? "btn btn-complete"
-                    : "btn"
-            }
-            onClick={() =>
-                updateOrderStatus(order.id, "เสร็จแล้ว")
-            }
-        >
-            เสร็จแล้ว
-        </button>
-
+            
         <button
             className={
                 order.status === "เสิร์ฟแล้ว"

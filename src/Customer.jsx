@@ -434,10 +434,6 @@ export default function Customer() {
                       <div className="status-pending">🟡 กำลังทำ</div>
                     )}
 
-                    {order.status === "เสร็จแล้ว" && (
-                      <div className="status-complete">🔵 เสร็จแล้ว</div>
-                    )}
-
                     {order.status === "เสิร์ฟแล้ว" && (
                       <div className="status-served">🟢 เสิร์ฟแล้ว</div>
                     )}
@@ -570,7 +566,7 @@ export default function Customer() {
               <option>ไม่ใส่น้ำแข็ง</option>
               <option>น้ำแข็งน้อย</option>
               <option>ปกติ</option>
-              <option>น้ำแข็งมาก</option>
+              <option>เพิ่มน้ำแข็ง</option>
             </select>
             <h3 style={{ marginTop: "20px" }}>
               หมายเหตุเพิ่มเติม

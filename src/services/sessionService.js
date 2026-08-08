@@ -46,11 +46,6 @@ export async function closeSessionIfNoActiveOrders(sessionId) {
   if (!sessionId) return;
 
   try {
-    const q = query(
-      collection(db, "orders"),
-      where("sessionId", "==", sessionId),
-      where("status", "in", ["กำลังทำ", "เสร็จแล้ว"])
-    );
 
     const snapshot = await getDocs(q);
 
