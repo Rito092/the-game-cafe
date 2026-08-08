@@ -2,13 +2,10 @@ import "./App.css";
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 
-import americanoImg from "./assets/menu/americano.png";
-import cappuccinoImg from "./assets/menu/cappuccino.png";
-import latteImg from "./assets/menu/latte.png";
-import matchaImg from "./assets/menu/matcha.png";
-
 import { getMenu } from "./services/menuService";
 import { createOrder } from "./services/orderService";
+import { subscribeToSessionOrders } from "./services/orderTrackingService";
+import { getOrCreateActiveSession } from "./services/sessionService";
 import { useCategories } from "./hooks/useCategories";
 import CategoryModal from "./components/CategoryModal";
 
@@ -24,19 +21,42 @@ export default function Customer() {
   const [note, setNote] = useState("");
   const [ordering, setOrdering] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [trackedOrders, setTrackedOrders] = useState([]);
+  const [sessionId, setSessionId] = useState(null);
 
   const { categories, loading: categoriesLoading } = useCategories();
-
-  const menuImages = {
-    americano: americanoImg,
-    cappuccino: cappuccinoImg,
-    latte: latteImg,
-    matcha: matchaImg,
-  };
 
   useEffect(() => {
     loadMenu();
   }, []);
+
+  useEffect(() => {
+    if (!tableNumber) return;
+
+    let cancelled = false;
+
+    getOrCreateActiveSession(tableNumber)
+      .then((id) => {
+        if (!cancelled) setSessionId(id);
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tableNumber]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const unsubscribe = subscribeToSessionOrders(sessionId, (orders) => {
+      setTrackedOrders(orders);
+    });
+
+    return () => unsubscribe();
+  }, [sessionId]);
 
   const loadMenu = async () => {
     try {
@@ -132,10 +152,16 @@ export default function Customer() {
       return;
     }
 
+    if (!sessionId) {
+      alert("กำลังเตรียมโต๊ะ กรุณาลองใหม่อีกครั้ง");
+      return;
+    }
+
     try {
       setOrdering(true);
       await createOrder({
         tableNumber: Number(tableNumber),
+        sessionId,
         items: cart,
         total,
       });
@@ -149,6 +175,22 @@ export default function Customer() {
       console.error(error);
       alert("เกิดข้อผิดพลาดในการสั่งอาหาร");
     }
+  };
+
+  const formatOrderTime = (timestamp) => {
+    if (!timestamp) return "ไม่มีเวลา";
+
+    if (timestamp.toDate) {
+      return timestamp.toDate().toLocaleString("th-TH", {
+        dateStyle: "short",
+        timeStyle: "short",
+      });
+    }
+
+    return new Date(timestamp).toLocaleString("th-TH", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
   };
 
   return (
@@ -190,9 +232,8 @@ export default function Customer() {
               <div key={item.id} className="menu-card">
                 <img
                   src={
-                    menuImages[
-                      item.name?.trim().toLowerCase()
-                    ]
+                    item.image ||
+                    "https://via.placeholder.com/300x200?text=No+Image"
                   }
                   alt={item.name}
                   className="menu-image"
@@ -368,6 +409,83 @@ export default function Customer() {
             )}
           </div>
         </div>
+
+        <h2 className="section-title">📦 ติดตามออเดอร์ของโต๊ะนี้</h2>
+
+        <div className="cart-center">
+          <div className="cart-panel">
+            {trackedOrders.length === 0 ? (
+              <p>ยังไม่มีออเดอร์</p>
+            ) : (
+              trackedOrders.map((order) => (
+                <div
+                  key={order.id}
+                  className="order-card"
+                  style={{ marginBottom: "16px" }}
+                >
+                  <p>
+                    <strong>โต๊ะ:</strong> {order.tableNumber ?? "-"}
+                  </p>
+
+                  <div className="status-line">
+                    <strong>สถานะ:</strong>
+
+                    {order.status === "กำลังทำ" && (
+                      <div className="status-pending">🟡 กำลังทำ</div>
+                    )}
+
+                    {order.status === "เสร็จแล้ว" && (
+                      <div className="status-complete">🔵 เสร็จแล้ว</div>
+                    )}
+
+                    {order.status === "เสิร์ฟแล้ว" && (
+                      <div className="status-served">🟢 เสิร์ฟแล้ว</div>
+                    )}
+
+                    {!order.status && <div>ไม่ทราบสถานะ</div>}
+                  </div>
+
+                  <p>
+                    <strong>ราคารวม:</strong> {order.total} บาท
+                  </p>
+
+                  <p>
+                    <strong>เวลา:</strong> {formatOrderTime(order.createdAt)}
+                  </p>
+
+                  <hr />
+
+                  <div className="order-items">
+                    {order.items?.map((item, index) => (
+                      <div key={index} style={{ marginBottom: "12px" }}>
+                        <div>
+                          • {item.name}
+                          {item.sweetness && <> ({item.sweetness})</>}
+                          {item.ice && <> 🧊 {item.ice}</>}
+                          {" "}x {item.qty || 1}
+                          {" "}
+                          ({item.price * (item.qty || 1)} บาท)
+                        </div>
+
+                        {item.note && (
+                          <div
+                            style={{
+                              color: "#dc2626",
+                              marginLeft: "18px",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            📝 {item.note}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </div>
 
       {selectedItem && (
@@ -393,9 +511,8 @@ export default function Customer() {
           >
             <img
               src={
-                menuImages[
-                  selectedItem.name?.trim().toLowerCase()
-                ]
+                selectedItem.image ||
+                "https://via.placeholder.com/300x200?text=No+Image"
               }
               alt={selectedItem.name}
               style={{
@@ -518,7 +635,7 @@ export default function Customer() {
         }
         onClose={() => setSelectedCategory(null)}
         onSelectItem={(item) => {
-          setSelectedCategory(null); // ปิด category modal ก่อนเสมอ กัน modal ซ้อน
+          setSelectedCategory(null);
           setSelectedItem(item);
           setSweetness("100%");
           setIce("ปกติ");

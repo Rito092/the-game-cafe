@@ -48,7 +48,10 @@ export default function CategoryModal({ category, items, onClose, onSelectItem }
             {items.map((item) => (
               <div key={item.id} className="menu-card">
                 <img
-                  src={item.image}
+                  src={
+                    item.image ||
+                    "https://via.placeholder.com/300x200?text=No+Image"
+                  }
                   alt={item.name}
                   className="menu-image"
                 />

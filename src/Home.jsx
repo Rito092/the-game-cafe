@@ -2,10 +2,6 @@ import "./App.css";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { db } from "./firebase";
-import americanoImg from "./assets/menu/americano.png";
-import cappuccinoImg from "./assets/menu/cappuccino.png";
-import latteImg from "./assets/menu/latte.png";
-import matchaImg from "./assets/menu/matcha.png";
 import {
     collection,
     addDoc,
@@ -19,6 +15,10 @@ import {
     onSnapshot,
 } from "firebase/firestore";
 import logo from "./assets/menu/logo.png";
+import {
+    getOrCreateActiveSession,
+    closeSessionIfNoActiveOrders,
+} from "./services/sessionService";
 function Home({ user, onLogout }) {
     const [cart, setCart] = useState([]);
     const [orders, setOrders] = useState([]);
@@ -26,12 +26,7 @@ function Home({ user, onLogout }) {
     const [tableNumber, setTableNumber] = useState("");
     const [searchTable, setSearchTable] = useState("");
     const [showDailyReport, setShowDailyReport] = useState(false);
-    const menuImages = {
-        americano: americanoImg,
-        cappuccino: cappuccinoImg,
-        latte: latteImg,
-        matcha: matchaImg,
-    };
+    
     const addToCart = (item) => {
         setCart((prev) => {
             const existingItem = prev.find((cartItem) => cartItem.id === item.id);
@@ -167,8 +162,11 @@ function Home({ user, onLogout }) {
         }
 
         try {
+            const sessionId = await getOrCreateActiveSession(tableNumber);
+
             await addDoc(collection(db, "orders"), {
                 tableNumber: tableNumber,
+                sessionId,
                 items: cart,
                 total: total,
                 status: "กำลังทำ",
@@ -181,6 +179,7 @@ function Home({ user, onLogout }) {
            
         } catch (error) {
             console.error(error);
+            alert("เกิดข้อผิดพลาดในการบันทึกออเดอร์");
         }
     };
 
@@ -195,6 +194,14 @@ function Home({ user, onLogout }) {
                     status: newStatus,
                 }
             );
+
+            if (newStatus === "เสิร์ฟแล้ว") {
+                const order = orders.find((o) => o.id === orderId);
+
+                if (order?.sessionId) {
+                    await closeSessionIfNoActiveOrders(order.sessionId);
+                }
+            }
 
             fetchOrders();
         } catch (error) {
@@ -354,7 +361,10 @@ function Home({ user, onLogout }) {
                 className="menu-card"
             >
                 <img
-                    src={menuImages[item.name?.trim().toLowerCase()]}
+                    src={
+                        item.image ||
+                        "https://via.placeholder.com/300x200?text=No+Image"
+                    }
                     alt={item.name}
                     className="menu-image"
                 />
