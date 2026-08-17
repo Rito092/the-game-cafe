@@ -1,6 +1,8 @@
 import "./App.css";
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "./firebase";
 
 import { getMenu } from "./services/menuService";
 import { createOrder } from "./services/orderService";
@@ -24,6 +26,11 @@ export default function Customer() {
   const [trackedOrders, setTrackedOrders] = useState([]);
   const [sessionId, setSessionId] = useState(null);
 
+  const [paymentInfo, setPaymentInfo] = useState(null);
+  const [paymentStatus, setPaymentStatus] = useState(null);
+  const [paymentError, setPaymentError] = useState(null);
+  const [creatingPayment, setCreatingPayment] = useState(false);
+const [paymentSuccessPopup, setPaymentSuccessPopup] = useState(false);
   const { categories, loading: categoriesLoading } = useCategories();
 
   useEffect(() => {
@@ -57,6 +64,34 @@ export default function Customer() {
 
     return () => unsubscribe();
   }, [sessionId]);
+
+  useEffect(() => {
+  if (!paymentInfo?.orderId) return;
+
+  const orderRef = doc(db, "orders", paymentInfo.orderId);
+
+  const unsubscribe = onSnapshot(
+    orderRef,
+    (snap) => {
+      if (!snap.exists()) return;
+
+      const data = snap.data();
+      const status = data.paymentStatus || "pending";
+
+      setPaymentStatus(status);
+
+      if (status === "paid") {
+        setPaymentSuccessPopup(true);
+      }
+    },
+    (error) => {
+      console.error(error);
+      setPaymentError("ไม่สามารถติดตามสถานะการชำระเงินได้");
+    }
+  );
+
+  return () => unsubscribe();
+}, [paymentInfo?.orderId]);
 
   const loadMenu = async () => {
     try {
@@ -146,6 +181,56 @@ export default function Customer() {
     0
   );
 
+  const requestPayment = async (orderId) => {
+    setPaymentError(null);
+    setCreatingPayment(true);
+
+    try {
+      const response = await fetch("/api/create-payment", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ orderId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data?.success) {
+        throw new Error(
+          data?.error || "ไม่สามารถสร้างรายการชำระเงินได้"
+        );
+      }
+
+      // เคสป้องกันไว้: order นี้ถูกจ่ายไปแล้ว (ไม่ควรเกิดกับ order ใหม่ แต่กันไว้)
+      if (data.alreadyPaid) {
+        setPaymentStatus("paid");
+        setCreatingPayment(false);
+        return;
+      }
+
+      if (!data.scannableCode) {
+        throw new Error("ไม่พบ QR สำหรับชำระเงิน");
+      }
+
+      setPaymentInfo({
+        orderId,
+        scannableCode: data.scannableCode,
+        amount: data.amount,
+        currency: data.currency,
+        productTotal: total,
+      });
+      setPaymentStatus(data.paymentStatus || "pending");
+    } catch (error) {
+      console.error(error);
+      setPaymentError(
+        error.message || "เกิดข้อผิดพลาดในการสร้างรายการชำระเงิน"
+      );
+    } finally {
+      setCreatingPayment(false);
+    }
+  };
+
   const confirmOrder = async () => {
     if (cart.length === 0) {
       alert("กรุณาเลือกสินค้า");
@@ -159,17 +244,21 @@ export default function Customer() {
 
     try {
       setOrdering(true);
-      await createOrder({
+      const docRef = await createOrder({
         tableNumber: Number(tableNumber),
         sessionId,
         items: cart,
         total,
       });
 
+      const orderId = docRef.id;
+
       alert("สั่งอาหารเรียบร้อย");
 
       setCart([]);
       setOrdering(false);
+
+      await requestPayment(orderId);
     } catch (error) {
       setOrdering(false);
       console.error(error);
@@ -203,6 +292,24 @@ export default function Customer() {
 
         <div className="report-panel">
           <h2>โต๊ะ {tableNumber}</h2>
+
+          {paymentStatus === "pending" && (
+            <p style={{ color: "#d97706", fontWeight: "bold" }}>
+              ⏳ รอชำระเงิน
+            </p>
+          )}
+
+          {paymentStatus === "paid" && (
+            <p style={{ color: "#16a34a", fontWeight: "bold" }}>
+              ✅ ชำระเงินสำเร็จ
+            </p>
+          )}
+
+          {paymentStatus === "failed" && (
+            <p style={{ color: "#dc2626", fontWeight: "bold" }}>
+              ❌ การชำระเงินไม่สำเร็จ
+            </p>
+          )}
         </div>
 
         <h2 className="section-title">🍔 เมนูอาหารและเครื่องดื่ม</h2>
@@ -405,6 +512,24 @@ export default function Customer() {
                 >
                   ยืนยันการสั่งซื้อ
                 </button>
+
+                {creatingPayment && (
+                  <p style={{ marginTop: "10px", color: "#666" }}>
+                    กำลังสร้างรายการชำระเงิน...
+                  </p>
+                )}
+
+                {paymentError && (
+                  <p
+                    style={{
+                      marginTop: "10px",
+                      color: "#dc2626",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {paymentError}
+                  </p>
+                )}
               </>
             )}
           </div>
@@ -444,7 +569,32 @@ export default function Customer() {
                   <p>
                     <strong>ราคารวม:</strong> {order.total} บาท
                   </p>
+<p>
+  <strong>การชำระเงิน:</strong>{" "}
+  {order.paymentStatus === "paid" && (
+    <span style={{ color: "#16a34a", fontWeight: "bold" }}>
+      ✅ ชำระเงินสำเร็จ
+    </span>
+  )}
 
+  {order.paymentStatus === "pending" && (
+    <span style={{ color: "#d97706", fontWeight: "bold" }}>
+      ⏳ รอชำระเงิน
+    </span>
+  )}
+
+  {order.paymentStatus === "failed" && (
+    <span style={{ color: "#dc2626", fontWeight: "bold" }}>
+      ❌ ชำระเงินไม่สำเร็จ
+    </span>
+  )}
+
+  {!order.paymentStatus && (
+    <span style={{ color: "#666" }}>
+      ยังไม่มีข้อมูล
+    </span>
+  )}
+</p>
                   <p>
                     <strong>เวลา:</strong> {formatOrderTime(order.createdAt)}
                   </p>
@@ -638,6 +788,177 @@ export default function Customer() {
           setNote("");
         }}
       />
+
+      {paymentInfo && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              width: "360px",
+              maxWidth: "90%",
+              borderRadius: "16px",
+              padding: "24px",
+              textAlign: "center",
+            }}
+          >
+            <h2>ชำระเงินผ่าน PromptPay</h2>
+
+            {paymentInfo.productTotal != null && (
+              <>
+                <p style={{ marginTop: "12px", color: "#666" }}>
+                  ยอดสินค้า
+                </p>
+                <p style={{ fontSize: "18px", fontWeight: "bold" }}>
+                  {Number(paymentInfo.productTotal).toFixed(2)} บาท
+                </p>
+              </>
+            )}
+
+            {paymentInfo.productTotal != null &&
+              Number(paymentInfo.productTotal) < 20 && (
+                <>
+                  <p style={{ marginTop: "12px", color: "#666" }}>
+                    ยอดชำระขั้นต่ำ
+                  </p>
+                  <p style={{ fontSize: "18px", fontWeight: "bold" }}>
+                    20.00 บาท
+                  </p>
+                </>
+              )}
+
+            {paymentInfo.amount != null && (
+              <>
+                <p style={{ marginTop: "12px", color: "#666" }}>
+                  ยอดที่ต้องชำระ
+                </p>
+                <p
+                  style={{
+                    fontSize: "20px",
+                    fontWeight: "bold",
+                    color: "#111",
+                  }}
+                >
+                  {(Number(paymentInfo.amount) / 100).toFixed(2)} บาท
+                </p>
+              </>
+            )}
+
+            <img
+              src={paymentInfo.scannableCode}
+              alt="PromptPay QR Code"
+              style={{
+                width: "240px",
+                height: "240px",
+                margin: "16px auto",
+                display: "block",
+              }}
+            />
+
+            {paymentStatus === "pending" && (
+              <p style={{ color: "#d97706", fontWeight: "bold" }}>
+                ⏳ รอชำระเงิน
+              </p>
+            )}
+
+            {paymentStatus === "paid" && (
+              <p style={{ color: "#16a34a", fontWeight: "bold" }}>
+                ✅ ชำระเงินสำเร็จ
+              </p>
+            )}
+
+            {paymentStatus === "failed" && (
+              <p style={{ color: "#dc2626", fontWeight: "bold" }}>
+                ❌ การชำระเงินไม่สำเร็จ
+              </p>
+            )}
+
+            <button
+              className="delete-btn"
+              style={{ marginTop: "20px" }}
+              onClick={() => setPaymentInfo(null)}
+            >
+              ปิด
+            </button>
+          </div>
+        </div>
+      )}
+      {paymentSuccessPopup && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.5)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 2000,
+    }}
+  >
+    <div
+      style={{
+        background: "#fff",
+        width: "360px",
+        maxWidth: "90%",
+        borderRadius: "16px",
+        padding: "30px 24px",
+        textAlign: "center",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "60px",
+          marginBottom: "10px",
+        }}
+      >
+        ✅
+      </div>
+
+      <h2
+        style={{
+          color: "#16a34a",
+          marginBottom: "12px",
+        }}
+      >
+        ชำระเงินสำเร็จ
+      </h2>
+
+      <p
+        style={{
+          color: "#666",
+          marginBottom: "8px",
+        }}
+      >
+        ระบบได้รับการชำระเงินของคุณแล้ว
+      </p>
+
+      <p
+        style={{
+          fontWeight: "bold",
+          marginBottom: "20px",
+        }}
+      >
+        ออเดอร์ของคุณกำลังดำเนินการ
+      </p>
+
+      <button
+        className="btn"
+        onClick={() => setPaymentSuccessPopup(false)}
+      >
+        ตกลง
+      </button>
+    </div>
+  </div>
+)}
     </>
   );
 }

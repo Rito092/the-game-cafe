@@ -61,7 +61,8 @@ function buildResponsePayload({ orderId, chargeData, paymentStatus }) {
     paymentStatus,
     amount: chargeData.amount,
     currency: chargeData.currency,
-    scannableCode: chargeData.source?.scannable_code || null,
+   scannableCode:
+        chargeData.source?.scannable_code?.image?.download_uri || null,
     authorizeUri: chargeData.authorize_uri || null,
     references: chargeData.source?.references || null,
   };
@@ -140,7 +141,14 @@ export default async function handler(req, res) {
     }
 
     // 3) สร้าง charge ใหม่ ด้วยราคาจริงจาก Firestore เท่านั้น
-    const amountSatang = Math.round(numericTotal * 100);
+    const MIN_CHARGE_SATANG = 2000; // ขั้นต่ำ 20 บาท
+    const rawAmountSatang = Math.round(
+      numericTotal * 100
+    );
+    const amountSatang = Math.max(
+      rawAmountSatang,
+      MIN_CHARGE_SATANG
+    );
 
     const { ok, status, data } = await createOmiseCharge(
       amountSatang,

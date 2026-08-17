@@ -453,6 +453,15 @@ function Home({ user, onLogout }) {
                         <strong>โต๊ะ:</strong>{" "}
                         {order.tableNumber || "-"}
                     </p>
+
+                    <p>
+                        <strong>💳 การชำระเงิน:</strong>{" "}
+                        {order.paymentStatus === "pending" && "⏳ รอชำระเงิน"}
+                        {order.paymentStatus === "paid" && "✅ ชำระเงินสำเร็จ"}
+                        {order.paymentStatus === "failed" && "❌ การชำระเงินไม่สำเร็จ"}
+                        {!order.paymentStatus && "ยังไม่มีข้อมูลการชำระเงิน"}
+                    </p>
+
                     <div className="status-line">
                         <strong>สถานะ:</strong>
 
@@ -475,6 +484,7 @@ function Home({ user, onLogout }) {
                         <strong>ราคารวม:</strong>{" "}
                         {order.total} บาท
                     </p>
+                    
                     <p>
     <strong>เวลา:</strong>{" "}
     {formatDate(order.createdAt)}
