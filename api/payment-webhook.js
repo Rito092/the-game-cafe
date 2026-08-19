@@ -38,7 +38,11 @@ async function findOrderByChargeId(chargeId) {
 
   const doc = snapshot.docs[0];
 
-  return { id: doc.id, ref: doc.ref, data: doc.data() };
+  return {
+    id: doc.id,
+    ref: doc.ref,
+    data: doc.data(),
+  };
 }
 
 function resolvePaymentStatus(chargeStatus) {
@@ -46,7 +50,8 @@ function resolvePaymentStatus(chargeStatus) {
   if (chargeStatus === "failed") return "failed";
   if (chargeStatus === "expired") return "failed";
   if (chargeStatus === "pending") return "pending";
-  return null; // สถานะที่ไม่รู้จัก - ไม่ทำอะไร
+
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -59,9 +64,17 @@ export default async function handler(req, res) {
   try {
     const event = req.body;
 
-    // Opn ส่ง event ทุกประเภทมาที่ webhook เดียวกัน (static webhook)
-    // สนใจเฉพาะ event ที่เกี่ยวกับ charge เท่านั้น
+    console.log("========== OPN WEBHOOK ==========");
+    console.log("Webhook received:", {
+      object: event?.data?.object,
+      event: event?.key,
+      chargeId: event?.data?.id,
+    });
+
+    // รับเฉพาะ event ที่เกี่ยวข้องกับ Charge
     if (!event || event.data?.object !== "charge") {
+      console.log("Webhook ignored: not a charge event");
+
       return res.status(200).json({
         received: true,
         ignored: true,
@@ -71,81 +84,165 @@ export default async function handler(req, res) {
     const chargeId = event.data.id;
 
     if (!chargeId) {
-      console.error("Webhook missing charge id in data:", event);
+      console.error(
+        "Webhook missing charge id:",
+        event
+      );
+
       return res.status(200).json({
         received: true,
         ignored: true,
       });
     }
 
-    // ห้ามเชื่อ payload ตรงๆ — ยิง GET ไปยืนยันกับ Opn อีกครั้งเสมอ
+    // --------------------------------------------------
+    // 1. ตรวจสอบ Charge กับ Opn โดยตรง
+    // --------------------------------------------------
+
     const charge = await getOmiseCharge(chargeId);
 
     if (!charge) {
-      // ดึง charge ไม่สำเร็จ (network / Opn ชั่วคราว) → ให้ Opn retry webhook นี้ใหม่
+      console.error(
+        "ไม่สามารถตรวจสอบ Charge กับ Opn ได้:",
+        chargeId
+      );
+
+      // ให้ Opn retry
       return res.status(500).json({
-        error: "ไม่สามารถตรวจสอบ Charge กับ Opn ได้ในขณะนี้",
+        error:
+          "ไม่สามารถตรวจสอบ Charge กับ Opn ได้ในขณะนี้",
       });
     }
+
+    console.log("Charge verified:", {
+      chargeId: charge.id,
+      status: charge.status,
+      amount: charge.amount,
+      currency: charge.currency,
+    });
+
+    // --------------------------------------------------
+    // 2. หา Order จาก chargeId
+    // --------------------------------------------------
 
     const order = await findOrderByChargeId(chargeId);
 
     if (!order) {
-      // หา order ที่ผูกกับ charge นี้ไม่เจอ - retry ก็ไม่ช่วย ไม่ log เป็น error รุนแรง แค่บันทึกไว้
       console.error(
-        "ไม่พบ order ที่ผูกกับ chargeId นี้:",
+        "ไม่พบ Order ที่ผูกกับ chargeId:",
         chargeId
       );
+
       return res.status(200).json({
         received: true,
         matchedOrder: false,
       });
     }
 
-    // Idempotency: จ่ายแล้วอยู่แล้ว ไม่ต้องทำอะไรซ้ำ
+    console.log("Order matched:", {
+      orderId: order.id,
+      currentPaymentStatus:
+        order.data.paymentStatus,
+      total: order.data.total,
+    });
+
+    // --------------------------------------------------
+    // 3. ถ้าจ่ายแล้ว ไม่ต้องทำซ้ำ
+    // --------------------------------------------------
+
     if (order.data.paymentStatus === "paid") {
+      console.log(
+        "Order already paid:",
+        order.id
+      );
+
       return res.status(200).json({
         received: true,
         alreadyPaid: true,
+        orderId: order.id,
+        paymentStatus: "paid",
       });
     }
 
-    const MIN_CHARGE_SATANG = 2000; // ยอดชำระขั้นต่ำของ Opn = 20 บาท
+    // --------------------------------------------------
+    // 4. ตรวจสอบยอดเงิน
+    // --------------------------------------------------
+
+    const MIN_CHARGE_SATANG = 2000;
 
     const rawAmountSatang = Math.round(
       Number(order.data.total) * 100
     );
 
     const expectedAmountSatang =
-      Number.isFinite(rawAmountSatang) && rawAmountSatang > 0
-        ? Math.max(rawAmountSatang, MIN_CHARGE_SATANG)
+      Number.isFinite(rawAmountSatang) &&
+      rawAmountSatang > 0
+        ? Math.max(
+            rawAmountSatang,
+            MIN_CHARGE_SATANG
+          )
         : rawAmountSatang;
 
     const amountMatches =
       Number.isFinite(expectedAmountSatang) &&
       charge.amount === expectedAmountSatang;
 
-    const currencyMatches = charge.currency === "THB";
+    const currencyMatches =
+      charge.currency === "THB";
 
-    const targetStatus = resolvePaymentStatus(charge.status);
+    console.log("Payment validation:", {
+      orderId: order.id,
+      expectedAmountSatang,
+      actualAmountSatang: charge.amount,
+      amountMatches,
+      expectedCurrency: "THB",
+      actualCurrency: charge.currency,
+      currencyMatches,
+    });
+
+    // --------------------------------------------------
+    // 5. แปลงสถานะ Opn → สถานะระบบ
+    // --------------------------------------------------
+
+    const targetStatus =
+      resolvePaymentStatus(charge.status);
 
     if (!targetStatus) {
-      // สถานะ charge ยังไม่เข้าเงื่อนไขที่รู้จัก (เช่น pending ที่ resolvePaymentStatus คืน "pending")
+      console.log(
+        "ไม่รู้จัก Charge status:",
+        charge.status
+      );
+
       return res.status(200).json({
         received: true,
+        orderId: order.id,
         chargeStatus: charge.status,
       });
     }
 
+    // --------------------------------------------------
+    // 6. ยังรอชำระเงิน
+    // --------------------------------------------------
+
     if (targetStatus === "pending") {
-      // ยังไม่จบ ไม่ต้องเขียนอะไรเพิ่ม
+      console.log(
+        "Payment still pending:",
+        order.id
+      );
+
       return res.status(200).json({
         received: true,
+        orderId: order.id,
         paymentStatus: "pending",
       });
     }
 
+    // --------------------------------------------------
+    // 7. ชำระเงินสำเร็จ
+    // --------------------------------------------------
+
     if (targetStatus === "paid") {
+      // ป้องกันยอดเงินผิด
       if (!amountMatches || !currencyMatches) {
         console.error(
           "จำนวนเงินหรือสกุลเงินไม่ตรงกับ Order:",
@@ -158,55 +255,103 @@ export default async function handler(req, res) {
           }
         );
 
-        // ห้ามตั้ง paid เมื่อจำนวนเงินไม่ตรง - ไม่ใช่ปัญหาที่ retry แล้วหาย
         return res.status(200).json({
           received: true,
-          error: "จำนวนเงินหรือสกุลเงินไม่ตรงกับ Order",
+          orderId: order.id,
+          error:
+            "จำนวนเงินหรือสกุลเงินไม่ตรงกับ Order",
         });
       }
 
+      // สำคัญ:
+      // paymentStatus อยู่ระดับเดียวกับ total/status
+      // เพื่อให้ Customer.jsx ที่ใช้ onSnapshot()
+      // ตรวจจับได้ทันที
       await order.ref.update({
         paymentStatus: "paid",
+
         payment: {
           ...order.data.payment,
+
           chargeId,
           chargeStatus: charge.status,
+
           paidAt: new Date().toISOString(),
         },
       });
 
+      console.log(
+        "================================"
+      );
+      console.log(
+        "PAYMENT SUCCESSFULLY UPDATED"
+      );
+      console.log("Order ID:", order.id);
+      console.log("Charge ID:", chargeId);
+      console.log("Payment Status: paid");
+      console.log(
+        "================================"
+      );
+
       return res.status(200).json({
         received: true,
+        orderId: order.id,
         paymentStatus: "paid",
       });
     }
 
-    // targetStatus === "failed"
-    if (order.data.paymentStatus === "failed") {
-      // ยิงซ้ำแต่ผลเดิม ไม่ต้องเขียนซ้ำ
+    // --------------------------------------------------
+    // 8. ชำระเงินไม่สำเร็จ
+    // --------------------------------------------------
+
+    if (targetStatus === "failed") {
+      if (order.data.paymentStatus === "failed") {
+        console.log(
+          "Order already marked failed:",
+          order.id
+        );
+
+        return res.status(200).json({
+          received: true,
+          alreadyFailed: true,
+          orderId: order.id,
+          paymentStatus: "failed",
+        });
+      }
+
+      await order.ref.update({
+        paymentStatus: "failed",
+
+        payment: {
+          ...order.data.payment,
+
+          chargeId,
+          chargeStatus: charge.status,
+        },
+      });
+
+      console.log(
+        "Payment marked as failed:",
+        order.id
+      );
+
       return res.status(200).json({
         received: true,
-        alreadyFailed: true,
+        orderId: order.id,
+        paymentStatus: "failed",
       });
     }
 
-    await order.ref.update({
-      paymentStatus: "failed",
-      payment: {
-        ...order.data.payment,
-        chargeId,
-        chargeStatus: charge.status,
-      },
-    });
-
     return res.status(200).json({
       received: true,
-      paymentStatus: "failed",
     });
   } catch (error) {
-    console.error("payment-webhook error:", error);
+    console.error(
+      "payment-webhook error:",
+      error
+    );
 
-    // error ไม่คาดคิด → ให้ Opn retry
+    // ให้ Opn retry
     return res.status(500).json({
       error: "เกิดข้อผิดพลาดภายในระบบ",
     });
