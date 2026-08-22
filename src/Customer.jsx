@@ -1,6 +1,6 @@
 import "./App.css";
 import { useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -32,6 +32,7 @@ export default function Customer() {
   const [creatingPayment, setCreatingPayment] = useState(false);
 const [paymentSuccessPopup, setPaymentSuccessPopup] = useState(false);
 const [trackedOrderId, setTrackedOrderId] = useState(null);
+const paymentSuccessShownRef = useRef(false);
   const { categories, loading: categoriesLoading } = useCategories();
 
   useEffect(() => {
@@ -69,7 +70,8 @@ const [trackedOrderId, setTrackedOrderId] = useState(null);
   useEffect(() => {
   if (!trackedOrderId) return;
 
-const orderRef = doc(db, "orders", trackedOrderId);
+  const orderRef = doc(db, "orders", trackedOrderId);
+
   const unsubscribe = onSnapshot(
     orderRef,
     (snap) => {
@@ -80,7 +82,9 @@ const orderRef = doc(db, "orders", trackedOrderId);
 
       setPaymentStatus(status);
 
-      if (status === "paid") {
+      if (status === "paid" && !paymentSuccessShownRef.current) {
+        paymentSuccessShownRef.current = true;
+
         setPaymentSuccessPopup(true);
         setPaymentInfo(null);
       }
@@ -182,10 +186,11 @@ const orderRef = doc(db, "orders", trackedOrderId);
     0
   );
 
-  const requestPayment = async (orderId) => {
-    setPaymentError(null);
-    setPaymentSuccessPopup(false);
-    setCreatingPayment(true);
+ const requestPayment = async (orderId) => {
+  setPaymentError(null);
+  setPaymentSuccessPopup(false);
+  paymentSuccessShownRef.current = false;
+  setCreatingPayment(true);
 
     try {
       const response = await fetch("/api/create-payment", {
