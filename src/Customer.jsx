@@ -31,6 +31,7 @@ export default function Customer() {
   const [paymentError, setPaymentError] = useState(null);
   const [creatingPayment, setCreatingPayment] = useState(false);
 const [paymentSuccessPopup, setPaymentSuccessPopup] = useState(false);
+const [trackedOrderId, setTrackedOrderId] = useState(null);
   const { categories, loading: categoriesLoading } = useCategories();
 
   useEffect(() => {
@@ -66,10 +67,9 @@ const [paymentSuccessPopup, setPaymentSuccessPopup] = useState(false);
   }, [sessionId]);
 
   useEffect(() => {
-  if (!paymentInfo?.orderId) return;
+  if (!trackedOrderId) return;
 
-  const orderRef = doc(db, "orders", paymentInfo.orderId);
-
+const orderRef = doc(db, "orders", trackedOrderId);
   const unsubscribe = onSnapshot(
     orderRef,
     (snap) => {
@@ -82,16 +82,17 @@ const [paymentSuccessPopup, setPaymentSuccessPopup] = useState(false);
 
       if (status === "paid") {
         setPaymentSuccessPopup(true);
+        setPaymentInfo(null);
       }
     },
     (error) => {
-      console.error(error);
+      console.error("Payment realtime error:", error);
       setPaymentError("ไม่สามารถติดตามสถานะการชำระเงินได้");
     }
   );
 
   return () => unsubscribe();
-}, [paymentInfo?.orderId]);
+}, [trackedOrderId]);
 
   const loadMenu = async () => {
     try {
@@ -183,6 +184,7 @@ const [paymentSuccessPopup, setPaymentSuccessPopup] = useState(false);
 
   const requestPayment = async (orderId) => {
     setPaymentError(null);
+    setPaymentSuccessPopup(false);
     setCreatingPayment(true);
 
     try {
@@ -204,7 +206,10 @@ const [paymentSuccessPopup, setPaymentSuccessPopup] = useState(false);
 
       // เคสป้องกันไว้: order นี้ถูกจ่ายไปแล้ว (ไม่ควรเกิดกับ order ใหม่ แต่กันไว้)
       if (data.alreadyPaid) {
+        setTrackedOrderId(orderId);
         setPaymentStatus("paid");
+        setPaymentSuccessPopup(true);
+        setPaymentInfo(null);
         setCreatingPayment(false);
         return;
       }
@@ -212,7 +217,7 @@ const [paymentSuccessPopup, setPaymentSuccessPopup] = useState(false);
       if (!data.scannableCode) {
         throw new Error("ไม่พบ QR สำหรับชำระเงิน");
       }
-
+setTrackedOrderId(orderId);
       setPaymentInfo({
         orderId,
         scannableCode: data.scannableCode,

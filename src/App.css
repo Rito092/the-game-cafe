@@ -475,3 +475,14 @@ h2,
   size: A4 portrait;
   margin: 8mm;
 }
+.container > .btn {
+  display: block;
+  margin: 20px auto;
+}
+.report-panel {
+  text-align: center;
+}
+
+.report-panel p {
+  text-align: center;
+}

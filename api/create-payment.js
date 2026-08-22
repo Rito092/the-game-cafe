@@ -128,6 +128,18 @@ export default async function handler(req, res) {
     ) {
       const existingCharge = await getOmiseCharge(order.payment.chargeId);
 
+      // Omise ยืนยันว่าชำระสำเร็จแล้วจริง แต่ Firestore ยังไม่ถูกอัปเดตเป็น paid
+      // (webhook อาจยังมาไม่ถึง) — ไม่เขียน Firestore เอง ปล่อยให้ webhook เป็นผู้ยืนยันตามเดิม
+      // แค่แจ้ง frontend ว่าจ่ายแล้ว เพื่อไม่ให้แสดง QR ซ้ำที่ทำให้เข้าใจผิดว่ายังไม่ได้จ่าย
+      if (existingCharge?.status === "successful") {
+        return res.status(200).json({
+          success: true,
+          orderId,
+          alreadyPaid: true,
+          paymentStatus: "paid",
+        });
+      }
+
       if (isChargeStillUsable(existingCharge)) {
         return res.status(200).json(
           buildResponsePayload({

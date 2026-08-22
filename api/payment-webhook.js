@@ -1,4 +1,76 @@
+import crypto from "node:crypto";
 import { adminDb } from "./_lib/firebase-admin.js";
+
+// ปิด body parser อัตโนมัติของ Vercel เพื่ออ่าน raw body สำหรับ verify signature
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+async function readRawBody(req) {
+  const chunks = [];
+
+  for await (const chunk of req) {
+    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+  }
+
+  return Buffer.concat(chunks);
+}
+
+function isWebhookSignatureValid(rawBodyBuffer, timestampHeader, signatureHeader) {
+  if (!timestampHeader || !signatureHeader) {
+    return false;
+  }
+
+  const secret = process.env.OMISE_WEBHOOK_SECRET;
+
+  if (!secret) {
+    console.error("OMISE_WEBHOOK_SECRET is not configured");
+    return false;
+  }
+
+  let secretBuffer;
+
+  try {
+    secretBuffer = Buffer.from(secret, "base64");
+  } catch (error) {
+    console.error("Unable to decode webhook secret");
+    return false;
+  }
+
+  const signedPayload = `${timestampHeader}.${rawBodyBuffer.toString("utf8")}`;
+
+  const expectedSignature = crypto
+    .createHmac("sha256", secretBuffer)
+    .update(signedPayload)
+    .digest();
+
+  const receivedSignatures = signatureHeader
+    .split(",")
+    .map((sig) => sig.trim())
+    .filter(Boolean);
+
+  for (const sig of receivedSignatures) {
+    let sigBuffer;
+
+    try {
+      sigBuffer = Buffer.from(sig, "hex");
+    } catch (error) {
+      continue;
+    }
+
+    if (sigBuffer.length !== expectedSignature.length) {
+      continue;
+    }
+
+    if (crypto.timingSafeEqual(sigBuffer, expectedSignature)) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 async function getOmiseCharge(chargeId) {
   const response = await fetch(
@@ -61,9 +133,39 @@ export default async function handler(req, res) {
     });
   }
 
-  try {
-    const event = req.body;
+  let rawBodyBuffer;
 
+  try {
+    rawBodyBuffer = await readRawBody(req);
+  } catch (error) {
+    console.error("Unable to read webhook request body:", error);
+    return res.status(400).json({
+      error: "Invalid request body",
+    });
+  }
+
+  const signatureHeader = req.headers["omise-signature"];
+  const timestampHeader = req.headers["omise-signature-timestamp"];
+
+  if (!isWebhookSignatureValid(rawBodyBuffer, timestampHeader, signatureHeader)) {
+    console.error("Webhook signature verification failed");
+    return res.status(401).json({
+      error: "Invalid signature",
+    });
+  }
+
+  let event;
+
+  try {
+    event = JSON.parse(rawBodyBuffer.toString("utf8"));
+  } catch (error) {
+    console.error("Unable to parse webhook body as JSON:", error);
+    return res.status(400).json({
+      error: "Invalid JSON body",
+    });
+  }
+
+  try {
     console.log("========== OPN WEBHOOK ==========");
     console.log("Webhook received:", {
       object: event?.data?.object,

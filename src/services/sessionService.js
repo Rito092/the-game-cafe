@@ -46,10 +46,19 @@ export async function closeSessionIfNoActiveOrders(sessionId) {
   if (!sessionId) return;
 
   try {
+    const q = query(
+      collection(db, "orders"),
+      where("sessionId", "==", sessionId)
+    );
 
     const snapshot = await getDocs(q);
 
-    if (!snapshot.empty) {
+    const hasActiveOrder = snapshot.docs.some((docSnap) => {
+      const status = docSnap.data().status;
+      return status === "กำลังทำ" || status === "เสร็จแล้ว";
+    });
+
+    if (hasActiveOrder) {
       return;
     }
 
